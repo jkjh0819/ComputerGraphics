@@ -1,0 +1,3 @@
+/Users/jihyejegal/git/ComputerGraphics/PA2_2017_skeleton/CMakeFiles/rebuild_cache.dir
+/Users/jihyejegal/git/ComputerGraphics/PA2_2017_skeleton/CMakeFiles/edit_cache.dir
+/Users/jihyejegal/git/ComputerGraphics/PA2_2017_skeleton/CMakeFiles/OgreFltk.dir
