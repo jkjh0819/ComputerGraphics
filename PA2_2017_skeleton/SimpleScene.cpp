@@ -24,6 +24,7 @@
 GLFWwindow* g_window=NULL;
 #endif
 void screenCoordToRay(int x, int y, Ray& ray);
+void CRS_spline(double p_x[], double p_y[], double p_z[]);
 
 // 'cameras' stores infomation of 5 cameras.
 double cameras[5][9] = 
@@ -47,12 +48,15 @@ int numCow = 0;
 matrix4 dupCow[6];
 vector3 prev;
 bool clicked = false;
+bool clickedCheck = false;
 bool ready = false;
 double curTime;	
 
 double CRS_x[6][4];
 double CRS_y[6][4];
 double CRS_z[6][4];
+vector3 moveCow;
+
 
 WaveFrontOBJ* cow;
 int cowID;
@@ -313,26 +317,37 @@ void display()
 
 			memset(dupCow, 0, sizeof(dupCow));
 			memset(CRS_x, 0, sizeof(CRS_x));
+			memset(CRS_y, 0, sizeof(CRS_y));
 			memset(CRS_z, 0, sizeof(CRS_z));
 
-			prev.x = 0.0f;
-			prev.y = 0.0f;
-			prev.z = 0.0f;
+			PickInfo &pp = pickInfo;
 
-			cow2wld.setTranslation(prev);
+			prev.x = pp.cowPickPosition.x;
+			prev.y = pp.cowPickPosition.y;
+			prev.z = pp.cowPickPosition.z;
+
 			cow2wld.setRotationY(-M_PI / 2);
+			cow2wld.setTranslation(prev);
 		}
 		else
 		{
 			t_time = curTime - (int)curTime;		
-			printf("%d %d\n", (int)curTime, t_time);
 			posCow.x = CRS_x[(int)curTime%6][3] + (CRS_x[(int)curTime%6][2] + t_time * (CRS_x[(int)curTime%6][1] + t_time * CRS_x[(int)curTime%6][0])) * t_time;
 			posCow.y = CRS_y[(int)curTime%6][3] + (CRS_y[(int)curTime%6][2] + t_time * (CRS_y[(int)curTime%6][1] + t_time * CRS_y[(int)curTime%6][0])) * t_time;
 			posCow.z = CRS_z[(int)curTime%6][3] + (CRS_z[(int)curTime%6][2] + t_time * (CRS_z[(int)curTime%6][1] + t_time * CRS_z[(int)curTime%6][0])) * t_time;
 
+			//printf("%d %d %d\n", posCow.x, posCow.y, posCow.z);
 			dirCow = posCow - prev;
 
-			cow2wld.setRotationY(-atan2(dirCow.z, dirCow.x));
+			matrix4 matTemp;
+			matrix4 matTemp2;
+
+			matTemp.setRotationY(-atan2(dirCow.z, dirCow.x)); //yaw
+			
+			matTemp2.setRotationZ(-atan2(-dirCow.y, sqrt(dirCow.z*dirCow.z + dirCow.x*dirCow.x)));
+			
+			matTemp.mult(matTemp, matTemp2);
+			cow2wld = matTemp;
 			cow2wld.setTranslation(posCow);
 
 			prev = posCow;
@@ -513,98 +528,35 @@ void onMouseButton(int button, int state)
 	{
 		if (state == GLFW_DOWN)
 		{
-			if(!clicked && cursorOnCowBoundingBox)
+			if(!clicked && cursorOnCowBoundingBox){
 				clicked = true;
-			if(clicked && !ready) {
-				isDrag=V_DRAG;	
+			}
+			else if(clickedCheck &&!ready) {
+				isDrag=V_DRAG;
 				printf( "Left mouse down-click at (%d, %d)\n", x, y );
-				// start vertical dragging
-				// TODO: you probably need a state variable.
-						
 			}	
 		}
 		else if(state == GLFW_UP)
 		{
-			if(clicked && !ready) {
-			isDrag=H_DRAG;
-			printf( "Left mouse up\n");
-			dupCow[numCow++] = cow2wld;
+			if(clicked && !clickedCheck && cursorOnCowBoundingBox){ //need cow selection
+				isDrag=H_DRAG;
+				clickedCheck = true;
+			} else if(clickedCheck &&!ready) {
+				isDrag=H_DRAG;
+				dupCow[numCow++] = cow2wld;
 				if(numCow == 6 ){
 					for(int i = 0; i < 6; i++) {
 						p_x[i] = dupCow[i].getTranslation().x;
 						p_y[i] = dupCow[i].getTranslation().y;
 						p_z[i] = dupCow[i].getTranslation().z;
 					}										
-					for(int i = 0; i < 3; i++) {
-						
-						CRS_x[i][0] = -0.5*p_x[i] + 1.5*p_x[i+1] - 1.5*p_x[i+2] + 0.5*p_x[i+3];
-						CRS_x[i][1] = p_x[i] - 2.5*p_x[i+1] + 2*p_x[i+2] - 0.5*p_x[i+3];
-						CRS_x[i][2] = -0.5*p_x[i] + 0.5*p_x[i+2];
-						CRS_x[i][3] = p_x[i+1];
-					
-						CRS_y[i][0] = -0.5*p_y[i] + 1.5*p_y[i+1] - 1.5*p_y[i+2] + 0.5*p_y[i+3];
-						CRS_y[i][1] = p_y[i] - 2.5*p_y[i+1] + 2*p_y[i+2] - 0.5*p_y[i+3];
-						CRS_y[i][2] = -0.5*p_y[i] + 0.5*p_y[i+2];
-						CRS_y[i][3] = p_y[i+1];
-
-						CRS_z[i][0] = -0.5*p_z[i] + 1.5*p_z[i+1] - 1.5*p_z[i+2] + 0.5*p_z[i+3];
-						CRS_z[i][1] = p_z[i] - 2.5*p_z[i+1] + 2*p_z[i+2] - 0.5*p_z[i+3];
-						CRS_z[i][2] = -0.5*p_z[i] + 0.5*p_z[i+2];
-						CRS_z[i][3] = p_z[i+1];
-					}
-				
-					CRS_x[3][0] = -0.5*p_x[3] + 1.5*p_x[4] - 1.5*p_x[5] + 0.5*p_x[0];
-					CRS_x[3][1] = p_x[3] - 2.5*p_x[4] + 2*p_x[5] - 0.5*p_x[0];
-					CRS_x[3][2] = -0.5*p_x[3] + 0.5*p_x[5];
-					CRS_x[3][3] = p_x[4];
-				
-					CRS_y[3][0] = -0.5*p_y[3] + 1.5*p_y[4] - 1.5*p_y[5] + 0.5*p_y[0];
-					CRS_y[3][1] = p_y[3] - 2.5*p_y[4] + 2*p_y[5] - 0.5*p_y[0];
-					CRS_y[3][2] = -0.5*p_y[3] + 0.5*p_y[5];
-					CRS_y[3][3] = p_y[4];
-
-					CRS_z[3][0] = -0.5*p_z[3] + 1.5*p_z[4] - 1.5*p_z[5] + 0.5*p_z[0];
-					CRS_z[3][1] = p_z[3] - 2.5*p_z[4] + 2*p_z[5] - 0.5*p_z[0];
-					CRS_z[3][2] = -0.5*p_z[3] + 0.5*p_z[5];
-					CRS_z[3][3] = p_z[4];
-
-					CRS_x[4][0] = -0.5*p_x[4] + 1.5*p_x[5] - 1.5*p_x[0] + 0.5*p_x[1];
-					CRS_x[4][1] = p_x[4] - 2.5*p_x[5] + 2*p_x[0] - 0.5*p_x[1];
-					CRS_x[4][2] = -0.5*p_x[4] + 0.5*p_x[0];
-					CRS_x[4][3] = p_x[5];
-				
-					CRS_y[4][0] = -0.5*p_y[4] + 1.5*p_y[5] - 1.5*p_y[0] + 0.5*p_y[1];
-					CRS_y[4][1] = p_y[4] - 2.5*p_y[5] + 2*p_y[0] - 0.5*p_y[1];
-					CRS_y[4][2] = -0.5*p_y[4] + 0.5*p_y[0];
-					CRS_y[4][3] = p_y[5];
-
-					CRS_z[4][0] = -0.5*p_z[4] + 1.5*p_z[5] - 1.5*p_z[0] + 0.5*p_z[1];
-					CRS_z[4][1] = p_z[4] - 2.5*p_z[5] + 2*p_z[0] - 0.5*p_z[1];
-					CRS_z[4][2] = -0.5*p_z[4] + 0.5*p_z[0];
-					CRS_z[4][3] = p_z[5];
-
-					CRS_x[5][0] = -0.5*p_x[5] + 1.5*p_x[0] - 1.5*p_x[1] + 0.5*p_x[2];
-					CRS_x[5][1] = p_x[5] - 2.5*p_x[0] + 2*p_x[1] - 0.5*p_x[2];
-					CRS_x[5][2] = -0.5*p_x[5] + 0.5*p_x[1];
-					CRS_x[5][3] = p_x[0];
-				
-					CRS_y[5][0] = -0.5*p_y[5] + 1.5*p_y[0] - 1.5*p_y[1] + 0.5*p_y[2];
-					CRS_y[5][1] = p_y[5] - 2.5*p_y[0] + 2*p_y[1] - 0.5*p_y[2];
-					CRS_y[5][2] = -0.5*p_y[5] + 0.5*p_y[1];
-					CRS_y[5][3] = p_y[0];
-
-					CRS_z[5][0] = -0.5*p_z[5] + 1.5*p_z[0] - 1.5*p_z[1] + 0.5*p_z[2];
-					CRS_z[5][1] = p_z[5] - 2.5*p_z[0] + 2*p_z[1] - 0.5*p_z[2];
-					CRS_z[5][2] = -0.5*p_z[5] + 0.5*p_z[1];
-					CRS_z[5][3] = p_z[0];
-
+					CRS_spline(p_x, p_y, p_z);
 
 					ready = true;
 					glfwSetTime(0.0f);
 
 					clicked = false;				
 				}	
-			// start horizontal dragging using mouse-move events.
 			}
 		} 
 	}
@@ -643,15 +595,18 @@ void onMouseDrag( int x, int y)
 				Ray ray;
 				screenCoordToRay(x, y, ray);
 				PickInfo &pp = pickInfo;
-				Plane p(vector3(0,0,1), pp.cowPickPosition);
+				
+				Plane p(vector3(1,0,0), pp.cowPickPosition);
+				//Plane p(ray.direction(), pp.cowPickPosition);
 				std::pair<bool, double> c=ray.intersects(p);
 
 				vector3 currentPos=ray.getPoint(c.second);	
-				printf("current : %lf %lf %lf\n",currentPos.x, currentPos.y, currentPos.z);
-				printf("cow picked : %lf %lf %lf\n", pp.cowPickPosition.x, pp.cowPickPosition.y, pp.cowPickPosition.z);
+		
+				moveCow.y = currentPos.y-pp.cowPickPosition.y;
 
 				matrix4 T;
-				T.setTranslation(currentPos-pp.cowPickPosition, false);
+				T.setTranslation(moveCow, false);
+				//T.setTranslation(currentPos-pp.cowPickPosition, false);
 				cow2wld.mult(T, pp.cowPickConfiguration);
 			}
 		}
@@ -668,11 +623,13 @@ void onMouseDrag( int x, int y)
 				std::pair<bool, double> c=ray.intersects(p);
 
 				vector3 currentPos=ray.getPoint(c.second);	
-				printf("current : %lf %lf %lf\n",currentPos.x, currentPos.y, currentPos.z);
-				printf("cow picked : %lf %lf %lf\n", pp.cowPickPosition.x, pp.cowPickPosition.y, pp.cowPickPosition.z);
+
+				moveCow.x = currentPos.x-pp.cowPickPosition.x;
+				moveCow.z = currentPos.z-pp.cowPickPosition.z;
 
 				matrix4 T;
-				T.setTranslation(currentPos-pp.cowPickPosition, false);
+				T.setTranslation(moveCow, false);
+				//T.setTranslation(currentPos-pp.cowPickPosition, false);
 				cow2wld.mult(T, pp.cowPickConfiguration);
 			}
 		}
@@ -704,6 +661,8 @@ void onMouseDrag( int x, int y)
 		invWorld.inverse(cow2wld);
 		// the local position (relative to the cow frame) of the pick position.
 		pp.cowPickPositionLocal=invWorld*pp.cowPickPosition;
+
+		moveCow.y = pp.cowPickPosition.y;
 	}
 
 }
@@ -815,4 +774,68 @@ int main( int argc, char* argv[] )
 	}
 #endif
 	return 0;
+}
+
+void CRS_spline(double p_x[], double p_y[], double p_z[]) {
+	for(int i = 1; i < 4; i++) {				
+		CRS_x[i][0] = -0.5*p_x[i-1] + 1.5*p_x[i] - 1.5*p_x[i+1] + 0.5*p_x[i+2];
+		CRS_x[i][1] = p_x[i-1] - 2.5*p_x[i] + 2*p_x[i+1] - 0.5*p_x[i+2];
+		CRS_x[i][2] = -0.5*p_x[i-1] + 0.5*p_x[i+1];
+		CRS_x[i][3] = p_x[i];
+
+		CRS_y[i][0] = -0.5*p_y[i-1] + 1.5*p_y[i] - 1.5*p_y[i+1] + 0.5*p_y[i+2];
+		CRS_y[i][1] = p_y[i-1] - 2.5*p_y[i] + 2*p_y[i+1] - 0.5*p_y[i+2];
+		CRS_y[i][2] = -0.5*p_y[i-1] + 0.5*p_y[i+1];
+		CRS_y[i][3] = p_y[i];
+
+		CRS_z[i][0] = -0.5*p_z[i-1] + 1.5*p_z[i] - 1.5*p_z[i+1] + 0.5*p_z[i+2];
+		CRS_z[i][1] = p_z[i-1] - 2.5*p_z[i] + 2*p_z[i+1] - 0.5*p_z[i+2];
+		CRS_z[i][2] = -0.5*p_z[i-1] + 0.5*p_z[i+1];
+		CRS_z[i][3] = p_z[i];
+	}
+				
+	CRS_x[4][0] = -0.5*p_x[3] + 1.5*p_x[4] - 1.5*p_x[5] + 0.5*p_x[0];
+	CRS_x[4][1] = p_x[3] - 2.5*p_x[4] + 2*p_x[5] - 0.5*p_x[0];
+	CRS_x[4][2] = -0.5*p_x[3] + 0.5*p_x[5];
+	CRS_x[4][3] = p_x[4];
+
+	CRS_y[4][0] = -0.5*p_y[3] + 1.5*p_y[4] - 1.5*p_y[5] + 0.5*p_y[0];
+	CRS_y[4][1] = p_y[3] - 2.5*p_y[4] + 2*p_y[5] - 0.5*p_y[0];
+	CRS_y[4][2] = -0.5*p_y[3] + 0.5*p_y[5];
+	CRS_y[4][3] = p_y[4];
+
+	CRS_z[4][0] = -0.5*p_z[3] + 1.5*p_z[4] - 1.5*p_z[5] + 0.5*p_z[0];
+	CRS_z[4][1] = p_z[3] - 2.5*p_z[4] + 2*p_z[5] - 0.5*p_z[0];
+	CRS_z[4][2] = -0.5*p_z[3] + 0.5*p_z[5];
+	CRS_z[4][3] = p_z[4];
+
+	CRS_x[5][0] = -0.5*p_x[4] + 1.5*p_x[5] - 1.5*p_x[0] + 0.5*p_x[1];
+	CRS_x[5][1] = p_x[4] - 2.5*p_x[5] + 2*p_x[0] - 0.5*p_x[1];
+	CRS_x[5][2] = -0.5*p_x[4] + 0.5*p_x[0];
+	CRS_x[5][3] = p_x[5];
+
+	CRS_y[5][0] = -0.5*p_y[4] + 1.5*p_y[5] - 1.5*p_y[0] + 0.5*p_y[1];
+	CRS_y[5][1] = p_y[4] - 2.5*p_y[5] + 2*p_y[0] - 0.5*p_y[1];
+	CRS_y[5][2] = -0.5*p_y[4] + 0.5*p_y[0];
+	CRS_y[5][3] = p_y[5];
+
+	CRS_z[5][0] = -0.5*p_z[4] + 1.5*p_z[5] - 1.5*p_z[0] + 0.5*p_z[1];
+	CRS_z[5][1] = p_z[4] - 2.5*p_z[5] + 2*p_z[0] - 0.5*p_z[1];
+	CRS_z[5][2] = -0.5*p_z[4] + 0.5*p_z[0];
+	CRS_z[5][3] = p_z[5];
+
+	CRS_x[0][0] = -0.5*p_x[5] + 1.5*p_x[0] - 1.5*p_x[1] + 0.5*p_x[2];
+	CRS_x[0][1] = p_x[5] - 2.5*p_x[0] + 2*p_x[1] - 0.5*p_x[2];
+	CRS_x[0][2] = -0.5*p_x[5] + 0.5*p_x[1];
+	CRS_x[0][3] = p_x[0];
+
+	CRS_y[0][0] = -0.5*p_y[5] + 1.5*p_y[0] - 1.5*p_y[1] + 0.5*p_y[2];
+	CRS_y[0][1] = p_y[5] - 2.5*p_y[0] + 2*p_y[1] - 0.5*p_y[2];
+	CRS_y[0][2] = -0.5*p_y[5] + 0.5*p_y[1];
+	CRS_y[0][3] = p_y[0];
+
+	CRS_z[0][0] = -0.5*p_z[5] + 1.5*p_z[0] - 1.5*p_z[1] + 0.5*p_z[2];
+	CRS_z[0][1] = p_z[5] - 2.5*p_z[0] + 2*p_z[1] - 0.5*p_z[2];
+	CRS_z[0][2] = -0.5*p_z[5] + 0.5*p_z[1];
+	CRS_z[0][3] = p_z[0];
 }
