@@ -43,10 +43,16 @@ WaveFrontOBJ* cam;
 // Variables for 'cow' object.
 matrix4 cow2wld;
 
-int numCow;
+int numCow = 0;
 matrix4 dupCow[6];
+vector3 prev;
 bool clicked = false;
 bool ready = false;
+double curTime;	
+
+double CRS_x[6][4];
+double CRS_y[6][4];
+double CRS_z[6][4];
 
 WaveFrontOBJ* cow;
 int cowID;
@@ -282,6 +288,8 @@ void drawFloor()
 **********************************************************************************/
 void display()
 {
+	vector3 posCow, dirCow;
+	double t_time;
 	glClearColor(0, 0.6, 0.8, 1);								// Clear color setting
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);				// Clear the screen
 	// set viewing transformation.
@@ -294,15 +302,52 @@ void display()
 	// update cow2wld here to animate the cow.
 	//double animTime=glfwGetTime()-animStartTime;
 	//you need to modify both the translation and rotation parts of the cow2wld matrix.
-		drawCow(cow2wld, cursorOnCowBoundingBox);														// Draw cow.
+	if(ready) {
+		curTime = glfwGetTime();			
+
+		if (curTime >= 18.0f)
+		{
+			numCow = 0;
+			curTime = 0.0f;
+			ready = false;
+
+			memset(dupCow, 0, sizeof(dupCow));
+			memset(CRS_x, 0, sizeof(CRS_x));
+			memset(CRS_z, 0, sizeof(CRS_z));
+
+			prev.x = 0.0f;
+			prev.y = 0.0f;
+			prev.z = 0.0f;
+
+			cow2wld.setTranslation(prev);
+			cow2wld.setRotationY(-M_PI / 2);
+		}
+		else
+		{
+			t_time = curTime - (int)curTime;		
+			printf("%d %d\n", (int)curTime, t_time);
+			posCow.x = CRS_x[(int)curTime%6][3] + (CRS_x[(int)curTime%6][2] + t_time * (CRS_x[(int)curTime%6][1] + t_time * CRS_x[(int)curTime%6][0])) * t_time;
+			posCow.y = 0.0f;
+			posCow.z = CRS_z[(int)curTime%6][3] + (CRS_z[(int)curTime%6][2] + t_time * (CRS_z[(int)curTime%6][1] + t_time * CRS_z[(int)curTime%6][0])) * t_time;
+
+			dirCow = posCow - prev;
+
+			cow2wld.setRotationY(-atan2(dirCow.z, dirCow.x));
+			cow2wld.setTranslation(posCow);
+
+			prev = posCow;
+		}
+	} else {
 		for(int i = 0; i < numCow; i++) {
 			drawCow(dupCow[i], false);
+		}
 	}
+	drawCow(cow2wld, cursorOnCowBoundingBox);
+	
 	
 	//drawBet();
 
 	glFlush();
-
 }
 
 
@@ -462,6 +507,7 @@ void onMouseButton(int button, int state)
 #else
 	glfwGetMousePos(&x, &y);
 #endif
+	static double p_x[6], p_y[6], p_z[6];
 
 	if (button == GLFW_MOUSE_BUTTON_LEFT)
 	{
@@ -476,7 +522,59 @@ void onMouseButton(int button, int state)
 				// TODO: you probably need a state variable.
 				dupCow[numCow++] = cow2wld;
 				if(numCow == 6 ){
-					//make catmull-rom spline
+					for(int i = 0; i < 6; i++) {
+						p_x[i] = dupCow[i].getTranslation().x;
+						p_y[i] = dupCow[i].getTranslation().y;
+						p_z[i] = dupCow[i].getTranslation().z;
+					}										
+					for(int i = 0; i < 3; i++) {
+						
+						CRS_x[i][0] = -0.5*p_x[i] + 1.5*p_x[i+1] - 1.5*p_x[i+2] + 0.5*p_x[i+3];
+						CRS_x[i][1] = p_x[i] - 2.5*p_x[i+1] + 2*p_x[i+2] - 0.5*p_x[i+3];
+						CRS_x[i][2] = -0.5*p_x[i] + 0.5*p_x[i+2];
+						CRS_x[i][3] = p_x[i+1];
+					
+						CRS_z[i][0] = -0.5*p_z[i] + 1.5*p_z[i+1] - 1.5*p_z[i+2] + 0.5*p_z[i+3];
+						CRS_z[i][1] = p_z[i] - 2.5*p_z[i+1] + 2*p_z[i+2] - 0.5*p_z[i+3];
+						CRS_z[i][2] = -0.5*p_z[i] + 0.5*p_z[i+2];
+						CRS_z[i][3] = p_z[i+1];
+					}
+				
+					CRS_x[3][0] = -0.5*p_x[3] + 1.5*p_x[4] - 1.5*p_x[5] + 0.5*p_x[0];
+					CRS_x[3][1] = p_x[3] - 2.5*p_x[4] + 2*p_x[5] - 0.5*p_x[0];
+					CRS_x[3][2] = -0.5*p_x[3] + 0.5*p_x[5];
+					CRS_x[3][3] = p_x[4];
+				
+					CRS_z[3][0] = -0.5*p_z[3] + 1.5*p_z[4] - 1.5*p_z[5] + 0.5*p_z[0];
+					CRS_z[3][1] = p_z[3] - 2.5*p_z[4] + 2*p_z[5] - 0.5*p_z[0];
+					CRS_z[3][2] = -0.5*p_z[3] + 0.5*p_z[5];
+					CRS_z[3][3] = p_z[4];
+
+					CRS_x[4][0] = -0.5*p_x[4] + 1.5*p_x[5] - 1.5*p_x[0] + 0.5*p_x[1];
+					CRS_x[4][1] = p_x[4] - 2.5*p_x[5] + 2*p_x[0] - 0.5*p_x[1];
+					CRS_x[4][2] = -0.5*p_x[4] + 0.5*p_x[0];
+					CRS_x[4][3] = p_x[5];
+				
+					CRS_z[4][0] = -0.5*p_z[4] + 1.5*p_z[5] - 1.5*p_z[0] + 0.5*p_z[1];
+					CRS_z[4][1] = p_z[4] - 2.5*p_z[5] + 2*p_z[0] - 0.5*p_z[1];
+					CRS_z[4][2] = -0.5*p_z[4] + 0.5*p_z[0];
+					CRS_z[4][3] = p_z[5];
+
+					CRS_x[5][0] = -0.5*p_x[5] + 1.5*p_x[0] - 1.5*p_x[1] + 0.5*p_x[2];
+					CRS_x[5][1] = p_x[5] - 2.5*p_x[0] + 2*p_x[1] - 0.5*p_x[2];
+					CRS_x[5][2] = -0.5*p_x[5] + 0.5*p_x[1];
+					CRS_x[5][3] = p_x[0];
+				
+					CRS_z[5][0] = -0.5*p_z[5] + 1.5*p_z[0] - 1.5*p_z[1] + 0.5*p_z[2];
+					CRS_z[5][1] = p_z[5] - 2.5*p_z[0] + 2*p_z[1] - 0.5*p_z[2];
+					CRS_z[5][2] = -0.5*p_z[5] + 0.5*p_z[1];
+					CRS_z[5][3] = p_z[0];
+
+
+					ready = true;
+					glfwSetTime(0.0f); // 시간을 0초로 초기화
+
+					clicked = false;				
 				}			
 			}	
 		}
@@ -524,7 +622,7 @@ void onMouseDrag( int x, int y)
 				Ray ray;
 				screenCoordToRay(x, y, ray);
 				PickInfo &pp = pickInfo;
-
+				
 			}
 		}
 		else
@@ -540,6 +638,8 @@ void onMouseDrag( int x, int y)
 				std::pair<bool, double> c=ray.intersects(p);
 
 				vector3 currentPos=ray.getPoint(c.second);	
+				printf("current : %lf %lf %lf\n",currentPos.x, currentPos.y, currentPos.z);
+				printf("cow picked : %lf %lf %lf\n", pp.cowPickPosition.x, pp.cowPickPosition.y, pp.cowPickPosition.z);
 
 				matrix4 T;
 				T.setTranslation(currentPos-pp.cowPickPosition, false);
