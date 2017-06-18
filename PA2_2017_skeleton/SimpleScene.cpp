@@ -327,7 +327,7 @@ void display()
 			t_time = curTime - (int)curTime;		
 			printf("%d %d\n", (int)curTime, t_time);
 			posCow.x = CRS_x[(int)curTime%6][3] + (CRS_x[(int)curTime%6][2] + t_time * (CRS_x[(int)curTime%6][1] + t_time * CRS_x[(int)curTime%6][0])) * t_time;
-			posCow.y = 0.0f;
+			posCow.y = CRS_y[(int)curTime%6][3] + (CRS_y[(int)curTime%6][2] + t_time * (CRS_y[(int)curTime%6][1] + t_time * CRS_y[(int)curTime%6][0])) * t_time;
 			posCow.z = CRS_z[(int)curTime%6][3] + (CRS_z[(int)curTime%6][2] + t_time * (CRS_z[(int)curTime%6][1] + t_time * CRS_z[(int)curTime%6][0])) * t_time;
 
 			dirCow = posCow - prev;
@@ -515,12 +515,20 @@ void onMouseButton(int button, int state)
 		{
 			if(!clicked && cursorOnCowBoundingBox)
 				clicked = true;
-			else if(clicked && !ready) {
+			if(clicked && !ready) {
 				isDrag=V_DRAG;	
 				printf( "Left mouse down-click at (%d, %d)\n", x, y );
 				// start vertical dragging
 				// TODO: you probably need a state variable.
-				dupCow[numCow++] = cow2wld;
+						
+			}	
+		}
+		else if(state == GLFW_UP)
+		{
+			if(clicked && !ready) {
+			isDrag=H_DRAG;
+			printf( "Left mouse up\n");
+			dupCow[numCow++] = cow2wld;
 				if(numCow == 6 ){
 					for(int i = 0; i < 6; i++) {
 						p_x[i] = dupCow[i].getTranslation().x;
@@ -534,6 +542,11 @@ void onMouseButton(int button, int state)
 						CRS_x[i][2] = -0.5*p_x[i] + 0.5*p_x[i+2];
 						CRS_x[i][3] = p_x[i+1];
 					
+						CRS_y[i][0] = -0.5*p_y[i] + 1.5*p_y[i+1] - 1.5*p_y[i+2] + 0.5*p_y[i+3];
+						CRS_y[i][1] = p_y[i] - 2.5*p_y[i+1] + 2*p_y[i+2] - 0.5*p_y[i+3];
+						CRS_y[i][2] = -0.5*p_y[i] + 0.5*p_y[i+2];
+						CRS_y[i][3] = p_y[i+1];
+
 						CRS_z[i][0] = -0.5*p_z[i] + 1.5*p_z[i+1] - 1.5*p_z[i+2] + 0.5*p_z[i+3];
 						CRS_z[i][1] = p_z[i] - 2.5*p_z[i+1] + 2*p_z[i+2] - 0.5*p_z[i+3];
 						CRS_z[i][2] = -0.5*p_z[i] + 0.5*p_z[i+2];
@@ -545,6 +558,11 @@ void onMouseButton(int button, int state)
 					CRS_x[3][2] = -0.5*p_x[3] + 0.5*p_x[5];
 					CRS_x[3][3] = p_x[4];
 				
+					CRS_y[3][0] = -0.5*p_y[3] + 1.5*p_y[4] - 1.5*p_y[5] + 0.5*p_y[0];
+					CRS_y[3][1] = p_y[3] - 2.5*p_y[4] + 2*p_y[5] - 0.5*p_y[0];
+					CRS_y[3][2] = -0.5*p_y[3] + 0.5*p_y[5];
+					CRS_y[3][3] = p_y[4];
+
 					CRS_z[3][0] = -0.5*p_z[3] + 1.5*p_z[4] - 1.5*p_z[5] + 0.5*p_z[0];
 					CRS_z[3][1] = p_z[3] - 2.5*p_z[4] + 2*p_z[5] - 0.5*p_z[0];
 					CRS_z[3][2] = -0.5*p_z[3] + 0.5*p_z[5];
@@ -555,6 +573,11 @@ void onMouseButton(int button, int state)
 					CRS_x[4][2] = -0.5*p_x[4] + 0.5*p_x[0];
 					CRS_x[4][3] = p_x[5];
 				
+					CRS_y[4][0] = -0.5*p_y[4] + 1.5*p_y[5] - 1.5*p_y[0] + 0.5*p_y[1];
+					CRS_y[4][1] = p_y[4] - 2.5*p_y[5] + 2*p_y[0] - 0.5*p_y[1];
+					CRS_y[4][2] = -0.5*p_y[4] + 0.5*p_y[0];
+					CRS_y[4][3] = p_y[5];
+
 					CRS_z[4][0] = -0.5*p_z[4] + 1.5*p_z[5] - 1.5*p_z[0] + 0.5*p_z[1];
 					CRS_z[4][1] = p_z[4] - 2.5*p_z[5] + 2*p_z[0] - 0.5*p_z[1];
 					CRS_z[4][2] = -0.5*p_z[4] + 0.5*p_z[0];
@@ -565,6 +588,11 @@ void onMouseButton(int button, int state)
 					CRS_x[5][2] = -0.5*p_x[5] + 0.5*p_x[1];
 					CRS_x[5][3] = p_x[0];
 				
+					CRS_y[5][0] = -0.5*p_y[5] + 1.5*p_y[0] - 1.5*p_y[1] + 0.5*p_y[2];
+					CRS_y[5][1] = p_y[5] - 2.5*p_y[0] + 2*p_y[1] - 0.5*p_y[2];
+					CRS_y[5][2] = -0.5*p_y[5] + 0.5*p_y[1];
+					CRS_y[5][3] = p_y[0];
+
 					CRS_z[5][0] = -0.5*p_z[5] + 1.5*p_z[0] - 1.5*p_z[1] + 0.5*p_z[2];
 					CRS_z[5][1] = p_z[5] - 2.5*p_z[0] + 2*p_z[1] - 0.5*p_z[2];
 					CRS_z[5][2] = -0.5*p_z[5] + 0.5*p_z[1];
@@ -572,17 +600,10 @@ void onMouseButton(int button, int state)
 
 
 					ready = true;
-					glfwSetTime(0.0f); // 시간을 0초로 초기화
+					glfwSetTime(0.0f);
 
 					clicked = false;				
-				}			
-			}	
-		}
-		else if(state == GLFW_UP)
-		{
-			if(clicked && !ready) {
-			isDrag=H_DRAG;
-			printf( "Left mouse up\n");
+				}	
 			// start horizontal dragging using mouse-move events.
 			}
 		} 
@@ -622,7 +643,16 @@ void onMouseDrag( int x, int y)
 				Ray ray;
 				screenCoordToRay(x, y, ray);
 				PickInfo &pp = pickInfo;
-				
+				Plane p(vector3(0,0,1), pp.cowPickPosition);
+				std::pair<bool, double> c=ray.intersects(p);
+
+				vector3 currentPos=ray.getPoint(c.second);	
+				printf("current : %lf %lf %lf\n",currentPos.x, currentPos.y, currentPos.z);
+				printf("cow picked : %lf %lf %lf\n", pp.cowPickPosition.x, pp.cowPickPosition.y, pp.cowPickPosition.z);
+
+				matrix4 T;
+				T.setTranslation(currentPos-pp.cowPickPosition, false);
+				cow2wld.mult(T, pp.cowPickConfiguration);
 			}
 		}
 		else
