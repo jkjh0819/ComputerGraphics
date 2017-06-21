@@ -293,7 +293,7 @@ void drawFloor()
 void display()
 {
 	vector3 posCow, dirCow;
-	double t_time;
+	double t;
 	glClearColor(0, 0.6, 0.8, 1);								// Clear color setting
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);				// Clear the screen
 	// set viewing transformation.
@@ -314,29 +314,22 @@ void display()
 			numCow = 0;
 			curTime = 0.0f;
 			ready = false;
+			clicked = false;
+			clickedCheck = false;
+			isDrag = 0;
 
 			memset(dupCow, 0, sizeof(dupCow));
 			memset(CRS_x, 0, sizeof(CRS_x));
 			memset(CRS_y, 0, sizeof(CRS_y));
 			memset(CRS_z, 0, sizeof(CRS_z));
-
-			PickInfo &pp = pickInfo;
-
-			prev.x = pp.cowPickPosition.x;
-			prev.y = pp.cowPickPosition.y;
-			prev.z = pp.cowPickPosition.z;
-
-			cow2wld.setRotationY(-M_PI / 2);
-			cow2wld.setTranslation(prev);
 		}
 		else
 		{
-			t_time = curTime - (int)curTime;		
-			posCow.x = CRS_x[(int)curTime%6][3] + (CRS_x[(int)curTime%6][2] + t_time * (CRS_x[(int)curTime%6][1] + t_time * CRS_x[(int)curTime%6][0])) * t_time;
-			posCow.y = CRS_y[(int)curTime%6][3] + (CRS_y[(int)curTime%6][2] + t_time * (CRS_y[(int)curTime%6][1] + t_time * CRS_y[(int)curTime%6][0])) * t_time;
-			posCow.z = CRS_z[(int)curTime%6][3] + (CRS_z[(int)curTime%6][2] + t_time * (CRS_z[(int)curTime%6][1] + t_time * CRS_z[(int)curTime%6][0])) * t_time;
+			t = curTime - (int)curTime;		
+			posCow.x = CRS_x[(int)curTime%6][3] + (CRS_x[(int)curTime%6][2] + t * (CRS_x[(int)curTime%6][1] + t * CRS_x[(int)curTime%6][0])) * t;
+			posCow.y = CRS_y[(int)curTime%6][3] + (CRS_y[(int)curTime%6][2] + t * (CRS_y[(int)curTime%6][1] + t * CRS_y[(int)curTime%6][0])) * t;
+			posCow.z = CRS_z[(int)curTime%6][3] + (CRS_z[(int)curTime%6][2] + t * (CRS_z[(int)curTime%6][1] + t * CRS_z[(int)curTime%6][0])) * t;
 
-			//printf("%d %d %d\n", posCow.x, posCow.y, posCow.z);
 			dirCow = posCow - prev;
 
 			matrix4 matTemp;
@@ -348,6 +341,7 @@ void display()
 			
 			matTemp.mult(matTemp, matTemp2);
 			cow2wld = matTemp;
+
 			cow2wld.setTranslation(posCow);
 
 			prev = posCow;
@@ -544,6 +538,7 @@ void onMouseButton(int button, int state)
 			} else if(clickedCheck &&!ready) {
 				isDrag=H_DRAG;
 				dupCow[numCow++] = cow2wld;
+
 				if(numCow == 6 ){
 					for(int i = 0; i < 6; i++) {
 						p_x[i] = dupCow[i].getTranslation().x;
@@ -596,8 +591,7 @@ void onMouseDrag( int x, int y)
 				screenCoordToRay(x, y, ray);
 				PickInfo &pp = pickInfo;
 				
-				Plane p(vector3(1,0,0), pp.cowPickPosition);
-				//Plane p(ray.direction(), pp.cowPickPosition);
+				Plane p(ray.direction(), pp.cowPickPosition);
 				std::pair<bool, double> c=ray.intersects(p);
 
 				vector3 currentPos=ray.getPoint(c.second);	
@@ -606,7 +600,6 @@ void onMouseDrag( int x, int y)
 
 				matrix4 T;
 				T.setTranslation(moveCow, false);
-				//T.setTranslation(currentPos-pp.cowPickPosition, false);
 				cow2wld.mult(T, pp.cowPickConfiguration);
 			}
 		}
@@ -629,7 +622,6 @@ void onMouseDrag( int x, int y)
 
 				matrix4 T;
 				T.setTranslation(moveCow, false);
-				//T.setTranslation(currentPos-pp.cowPickPosition, false);
 				cow2wld.mult(T, pp.cowPickConfiguration);
 			}
 		}
@@ -662,7 +654,7 @@ void onMouseDrag( int x, int y)
 		// the local position (relative to the cow frame) of the pick position.
 		pp.cowPickPositionLocal=invWorld*pp.cowPickPosition;
 
-		moveCow.y = pp.cowPickPosition.y;
+		moveCow.y = pp.cowPickPositionLocal.y;
 	}
 
 }
