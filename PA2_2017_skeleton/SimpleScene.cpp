@@ -44,13 +44,16 @@ WaveFrontOBJ* cam;
 // Variables for 'cow' object.
 matrix4 cow2wld;
 
+//variable for PA2
 int numCow = 0;
 matrix4 dupCow[6];
 vector3 prev;
 bool clicked = false;
 bool clickedCheck = false;
 bool ready = false;
-double curTime;	
+bool vdragStart = false;
+double curTime;
+double correction;
 
 double CRS_x[6][4];
 double CRS_y[6][4];
@@ -306,10 +309,10 @@ void display()
 	// update cow2wld here to animate the cow.
 	//double animTime=glfwGetTime()-animStartTime;
 	//you need to modify both the translation and rotation parts of the cow2wld matrix.
-	if(ready) {
+	if(ready) { //run catmull-rom spline
 		curTime = glfwGetTime();			
 
-		if (curTime >= 18.0f)
+		if (curTime >= 18.0f) //execution finished, initialize status
 		{
 			numCow = 0;
 			curTime = 0.0f;
@@ -325,12 +328,12 @@ void display()
 		}
 		else
 		{
-			t = curTime - (int)curTime;		
+			t = curTime - (int)curTime;	//시간 변수 t	
 			posCow.x = CRS_x[(int)curTime%6][3] + (CRS_x[(int)curTime%6][2] + t * (CRS_x[(int)curTime%6][1] + t * CRS_x[(int)curTime%6][0])) * t;
 			posCow.y = CRS_y[(int)curTime%6][3] + (CRS_y[(int)curTime%6][2] + t * (CRS_y[(int)curTime%6][1] + t * CRS_y[(int)curTime%6][0])) * t;
 			posCow.z = CRS_z[(int)curTime%6][3] + (CRS_z[(int)curTime%6][2] + t * (CRS_z[(int)curTime%6][1] + t * CRS_z[(int)curTime%6][0])) * t;
 
-			dirCow = posCow - prev;
+			dirCow = posCow - prev; //방향 벡터 
 
 			matrix4 matTemp;
 			matrix4 matTemp2;
@@ -339,19 +342,19 @@ void display()
 			
 			matTemp2.setRotationZ(-atan2(-dirCow.y, sqrt(dirCow.z*dirCow.z + dirCow.x*dirCow.x)));
 			
-			matTemp.mult(matTemp, matTemp2);
+			matTemp.mult(matTemp, matTemp2); //yaw and pitch orientation
 			cow2wld = matTemp;
 
-			cow2wld.setTranslation(posCow);
+			cow2wld.setTranslation(posCow); //set position
 
 			prev = posCow;
 		}
 	} else {
 		for(int i = 0; i < numCow; i++) {
-			drawCow(dupCow[i], false);
+			drawCow(dupCow[i], false); //draw selected cow
 		}
 	}
-	drawCow(cow2wld, cursorOnCowBoundingBox);
+	drawCow(cow2wld, cursorOnCowBoundingBox); //current cow
 	
 	
 	//drawBet();
@@ -522,11 +525,13 @@ void onMouseButton(int button, int state)
 	{
 		if (state == GLFW_DOWN)
 		{
-			if(!clicked && cursorOnCowBoundingBox){
+			if(!clicked && cursorOnCowBoundingBox){ //need cow selectoin
 				clicked = true;
 			}
-			else if(clickedCheck &&!ready) {
+			else if(clickedCheck &&!ready) { //after cow selection
 				isDrag=V_DRAG;
+				vdragStart = true;
+
 				printf( "Left mouse down-click at (%d, %d)\n", x, y );
 			}	
 		}
@@ -535,11 +540,14 @@ void onMouseButton(int button, int state)
 			if(clicked && !clickedCheck && cursorOnCowBoundingBox){ //need cow selection
 				isDrag=H_DRAG;
 				clickedCheck = true;
+				vdragStart = false;
 			} else if(clickedCheck &&!ready) {
 				isDrag=H_DRAG;
-				dupCow[numCow++] = cow2wld;
+				vdragStart = false;
 
-				if(numCow == 6 ){
+				dupCow[numCow++] = cow2wld; //add cow
+
+				if(numCow == 6 ){ //calculate catmull-rom spline
 					for(int i = 0; i < 6; i++) {
 						p_x[i] = dupCow[i].getTranslation().x;
 						p_y[i] = dupCow[i].getTranslation().y;
@@ -579,6 +587,7 @@ void onMouseDrag( int x, int y)
 #endif
 	if (isDrag) 
 	{
+		
 		printf( "in drag mode %d\n", isDrag);
 		if (isDrag==V_DRAG)
 		{
@@ -596,7 +605,18 @@ void onMouseDrag( int x, int y)
 
 				vector3 currentPos=ray.getPoint(c.second);	
 		
+				//vertical move이므로 y값만 변경, y축이 초록색
+
 				moveCow.y = currentPos.y-pp.cowPickPosition.y;
+
+				if(vdragStart == true) { 
+				//y축 이동 후 다른 위치에서 vertical move시 소 위치가 뜨는 경우가 있어 보정이 필요 
+					correction = moveCow.y;
+					vdragStart = false;
+				}
+
+				//소 위치 보정
+				moveCow.y -= correction;
 
 				matrix4 T;
 				T.setTranslation(moveCow, false);
@@ -616,6 +636,8 @@ void onMouseDrag( int x, int y)
 				std::pair<bool, double> c=ray.intersects(p);
 
 				vector3 currentPos=ray.getPoint(c.second);	
+
+				//horizontal 이동이므로 x,z만 변경
 
 				moveCow.x = currentPos.x-pp.cowPickPosition.x;
 				moveCow.z = currentPos.z-pp.cowPickPosition.z;
@@ -654,6 +676,7 @@ void onMouseDrag( int x, int y)
 		// the local position (relative to the cow frame) of the pick position.
 		pp.cowPickPositionLocal=invWorld*pp.cowPickPosition;
 
+		//소 y축 위치 initialize
 		moveCow.y = pp.cowPickPositionLocal.y;
 	}
 
@@ -768,6 +791,7 @@ int main( int argc, char* argv[] )
 	return 0;
 }
 
+//Catmull-Rom Spline 계산하는 함수, 미리 수업자료 pdf에 나와있는 행렬 계산하고 적용함.
 void CRS_spline(double p_x[], double p_y[], double p_z[]) {
 	for(int i = 1; i < 4; i++) {				
 		CRS_x[i][0] = -0.5*p_x[i-1] + 1.5*p_x[i] - 1.5*p_x[i+1] + 0.5*p_x[i+2];
@@ -786,6 +810,7 @@ void CRS_spline(double p_x[], double p_y[], double p_z[]) {
 		CRS_z[i][3] = p_z[i];
 	}
 				
+	//아래는 cyclic spline을 위함.
 	CRS_x[4][0] = -0.5*p_x[3] + 1.5*p_x[4] - 1.5*p_x[5] + 0.5*p_x[0];
 	CRS_x[4][1] = p_x[3] - 2.5*p_x[4] + 2*p_x[5] - 0.5*p_x[0];
 	CRS_x[4][2] = -0.5*p_x[3] + 0.5*p_x[5];
